@@ -6,7 +6,7 @@ version=1.0
 author=UAV4GEO
 email=pt@uav4geo.com
 
-about=A tool to seamlessly merge overlapping orthophotos
+about=Seamlessly merge overlapping rasters
 
 tracker=http://github.com/uav4geo/QRasterMerge/issues
 repository=http://github.com/uav4geo/QRasterMerge

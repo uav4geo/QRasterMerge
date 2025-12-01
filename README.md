@@ -4,6 +4,8 @@
 
 QGIS plugin for seamlessly merging overlapping rasters. It features memory-efficient cutline merging and histogram matching capabilities.
 
+![Image](https://github.com/user-attachments/assets/7d5ed474-5c1c-4be1-ab7b-b14927477312)
+
 ## Installation
 
 Install `QRasterMerge` via the [QGIS](https://qgis.org) plugin manager. Before you install it, make sure you also have the [QPIP](https://github.com/opengisch/qpip) plugin installed, which will take care of installing a few dependencies for you.
