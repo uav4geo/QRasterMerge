@@ -39,15 +39,15 @@ class RasterMergePlugin(object):
     def initGui(self):
         self.initProcessing()
 
-        self.merge_orthos = QAction(QIcon(os.path.join(os.path.dirname(__file__), "icons", "qrastermerge.svg")), "Merge Orthophotos")
-        self.merge_orthos.triggered.connect(self.merge_orthos_click)
+        self.merge_orthos = QAction(QIcon(os.path.join(os.path.dirname(__file__), "icons", "qrastermerge.svg")), "Seamless Merge")
+        self.merge_orthos.triggered.connect(self.seamless_merge_click)
         self.iface.addToolBarIcon(self.merge_orthos)
 
         self.iface.addPluginToRasterMenu("QRasterMerge", self.merge_orthos)
 
-    def merge_orthos_click(self):
+    def seamless_merge_click(self):
         # iface.openProcessingAlgorithm()
-        results = processing.execAlgorithmDialog('uav4geo:Orthophoto Merge')
+        results = processing.execAlgorithmDialog('uav4geo:Seamless Merge')
 
     def unload(self):
         QgsApplication.processingRegistry().removeProvider(self.provider)

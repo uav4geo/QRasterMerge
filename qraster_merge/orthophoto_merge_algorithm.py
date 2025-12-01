@@ -213,7 +213,7 @@ class OrthophotoMergeAlgorithm(QgsProcessingAlgorithm):
         lowercase alphanumeric characters only and no spaces or other
         formatting characters.
         """
-        return 'Orthophoto Merge'
+        return 'Seamless Merge'
 
     def displayName(self):
         """
