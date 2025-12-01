@@ -72,7 +72,7 @@ class OrthophotoMergeAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterEnum(
                 'EQUALIZE_HISTOGRAMS',
                 self.tr('Equalize Color Histograms'),
-                options=['LCH', 'RGB', 'Do not equalize (keep original pixels)'],
+                options=['RGB', 'LCH', 'Do not equalize (keep original pixels)'],
                 defaultValue=0,
                 allowMultiple=False
             )
@@ -124,7 +124,7 @@ class OrthophotoMergeAlgorithm(QgsProcessingAlgorithm):
         temp_dir = QgsProcessingUtils.tempFolder()
         INFO(f"Using temporary directory: {temp_dir}")
 
-        equalize = ['LCH', 'RGB', 'None'][equalize_histograms]
+        equalize = ['RGB', 'LCH', 'None'][equalize_histograms]
         sources = []
 
         if equalize != 'None':

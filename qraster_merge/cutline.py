@@ -20,7 +20,8 @@ from .io import related_file_path
 if sys.platform == 'win32':
     # Temporary fix for: ValueError: GEOSGeom_createLinearRing_r returned a NULL pointer  
     # https://github.com/Toblerity/Shapely/issues/1005
-    shapely.speedups.disable()
+    if hasattr(shapely, 'speedups'):
+        shapely.speedups.disable()
 
 def write_raster(data, file):
     profile = {
