@@ -1,6 +1,6 @@
 rasterio>=1.4.1
 Fiona>=1.10.1
-edt>=2.4.1
+edt==3.0.0
 numpy>=1.26.4
 scikit-image>=0.25.2
 Shapely>=2.1.1
