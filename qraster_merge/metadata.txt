@@ -1,0 +1,27 @@
+[general]
+name=QRasterMerge
+qgisMinimumVersion=3.34
+description=Seamless orthophoto merging and blending
+version=1.0
+author=UAV4GEO
+email=pt@uav4geo.com
+
+about=A tool to seamlessly merge overlapping orthophotos
+
+tracker=http://github.com/uav4geo/QRasterMerge/issues
+repository=http://github.com/uav4geo/QRasterMerge
+
+hasProcessingProvider=yes
+tags=raster, merge, orthophoto, blend, seamless
+
+homepage=http://github.com/uav4geo/QRasterMerge
+category=Raster
+icon=icons/qrastermerge.svg
+experimental=False
+
+deprecated=False
+plugin_dependencies=qpip
+
+# If the plugin can run on QGIS Server.
+server=False
+
