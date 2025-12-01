@@ -16,6 +16,7 @@ from qgis.core import QgsProcessingAlgorithm, QgsApplication
 from qgis.PyQt.QtWidgets import QAction, QApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.utils import iface
+import processing
 from .raster_merge_provider import RasterMergeProvider
 
 cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
@@ -45,7 +46,8 @@ class RasterMergePlugin(object):
         self.iface.addPluginToRasterMenu("QRasterMerge", self.merge_orthos)
 
     def merge_orthos_click(self):
-        iface.openProcessingAlgorithm('rastermerge:mergeorthophotos')
+        # iface.openProcessingAlgorithm()
+        results = processing.execAlgorithmDialog('uav4geo:Orthophoto Merge')
 
     def unload(self):
         QgsApplication.processingRegistry().removeProvider(self.provider)

@@ -6,29 +6,18 @@ import fiona
 from edt import edt
 from rasterio.transform import Affine, rowcol
 from rasterio.mask import mask
-
-
-# TODO
-class Logger:
-    def ODM_WARNING(self, msg):
-        print(msg)
-
-    def ODM_INFO(self, msg):
-        print(msg)    
-
-log = Logger()
-
+from .log import WARNING, INFO
 
 def compute_mask_raster(input_raster, vector_mask, output_raster, blend_distance=20, only_max_coords_feature=False):
     if not os.path.exists(input_raster):
-        log.ODM_WARNING("Cannot mask raster, %s does not exist" % input_raster)
+        WARNING("Cannot mask raster, %s does not exist" % input_raster)
         return
     
     if not os.path.exists(vector_mask):
-        log.ODM_WARNING("Cannot mask raster, %s does not exist" % vector_mask)
+        WARNING("Cannot mask raster, %s does not exist" % vector_mask)
         return
 
-    log.ODM_INFO("Computing mask raster: %s" % output_raster)
+    INFO("Computing mask raster: %s" % output_raster)
 
     with rasterio.open(input_raster, 'r') as rast:
         with fiona.open(vector_mask) as src:
@@ -58,9 +47,16 @@ def compute_mask_raster(input_raster, vector_mask, output_raster, blend_distance
                     dist_t[dist_t > blend_distance] = 1
                     np.multiply(alpha_band, dist_t, out=alpha_band, casting="unsafe")
                 else:
-                    log.ODM_WARNING("%s does not have an alpha band, cannot blend cutline!" % input_raster)
+                    WARNING("%s does not have an alpha band, cannot blend cutline!" % input_raster)
 
-            with rasterio.open(output_raster, 'w', BIGTIFF="IF_SAFER", **rast.profile) as dst:
+            profile = rast.profile.copy()
+            profile["compress"] = 'LZW'
+            profile["predictor"] = '2'
+            profile["tiled"] = 'YES'
+            profile["blockxsize"] = 512
+            profile["blockysize"] = 512
+
+            with rasterio.open(output_raster, 'w', **profile) as dst:
                 dst.colorinterp = rast.colorinterp
                 dst.write(out_image)
 
@@ -68,10 +64,10 @@ def compute_mask_raster(input_raster, vector_mask, output_raster, blend_distance
 
 def feather_raster(input_raster, output_raster, blend_distance=20):
     if not os.path.exists(input_raster):
-        log.ODM_WARNING("Cannot feather raster, %s does not exist" % input_raster)
+        WARNING("Cannot feather raster, %s does not exist" % input_raster)
         return
 
-    log.ODM_INFO("Computing feather raster: %s" % output_raster)
+    INFO("Computing feather raster: %s" % output_raster)
     
     with rasterio.open(input_raster, 'r') as rast:
         out_image = rast.read()
@@ -83,15 +79,22 @@ def feather_raster(input_raster, output_raster, blend_distance=20):
                 dist_t[dist_t > blend_distance] = 1
                 np.multiply(alpha_band, dist_t, out=alpha_band, casting="unsafe")
             else:
-                log.ODM_WARNING("%s does not have an alpha band, cannot feather raster!" % input_raster)
+                WARNING("%s does not have an alpha band, cannot feather raster!" % input_raster)
 
-        with rasterio.open(output_raster, 'w', BIGTIFF="IF_SAFER", **rast.profile) as dst:
+        profile = rast.profile.copy()
+        profile["compress"] = 'LZW'
+        profile["predictor"] = '2'
+        profile["tiled"] = 'YES'
+        profile["blockxsize"] = 512
+        profile["blockysize"] = 512
+
+        with rasterio.open(output_raster, 'w', **profile) as dst:
             dst.colorinterp = rast.colorinterp
             dst.write(out_image)
 
         return output_raster
 
-def merge(input_ortho_and_ortho_cuts, output_orthophoto, orthophoto_vars={}):
+def merge(input_ortho_and_ortho_cuts, output_orthophoto, orthophoto_vars={}, feedback=None):
     """
     Based on https://github.com/mapbox/rio-merge-rgba/
     Merge orthophotos around cutlines using a blend buffer.
@@ -102,15 +105,15 @@ def merge(input_ortho_and_ortho_cuts, output_orthophoto, orthophoto_vars={}):
 
     for o, c in input_ortho_and_ortho_cuts:
         if not os.path.isfile(o):
-            log.ODM_WARNING("%s does not exist. Will skip from merged orthophoto." % o)
+            WARNING("%s does not exist. Will skip from merged orthophoto." % o)
             continue
         if not os.path.isfile(c):
-            log.ODM_WARNING("%s does not exist. Will skip from merged orthophoto." % c)
+            WARNING("%s does not exist. Will skip from merged orthophoto." % c)
             continue
         inputs.append((o, c))
 
     if len(inputs) == 0:
-        log.ODM_WARNING("No input orthophotos, skipping merge.")
+        WARNING("No input orthophotos, skipping merge.")
         return
 
     with rasterio.open(inputs[0][0]) as first:
@@ -120,7 +123,7 @@ def merge(input_ortho_and_ortho_cuts, output_orthophoto, orthophoto_vars={}):
         num_bands = first.meta['count'] - 1 # minus alpha
         colorinterp = first.colorinterp
 
-    log.ODM_INFO("%s valid orthophoto rasters to merge" % len(inputs))
+    INFO("%s valid orthophoto rasters to merge" % len(inputs))
     sources = [(rasterio.open(o), rasterio.open(c)) for o,c in inputs]
 
     # scan input files.
@@ -134,7 +137,7 @@ def merge(input_ortho_and_ortho_cuts, output_orthophoto, orthophoto_vars={}):
         if src.profile["count"] < 2:
             raise ValueError("Inputs must be at least 2-band rasters")
     dst_w, dst_s, dst_e, dst_n = min(xs), min(ys), max(xs), max(ys)
-    log.ODM_INFO("Output bounds: %r %r %r %r" % (dst_w, dst_s, dst_e, dst_n))
+    INFO("Output bounds: %r %r %r %r" % (dst_w, dst_s, dst_e, dst_n))
 
     output_transform = Affine.translation(dst_w, dst_n)
     output_transform *= Affine.scale(res[0], -res[1])
@@ -146,8 +149,8 @@ def merge(input_ortho_and_ortho_cuts, output_orthophoto, orthophoto_vars={}):
 
     # Adjust bounds to fit.
     dst_e, dst_s = output_transform * (output_width, output_height)
-    log.ODM_INFO("Output width: %d, height: %d" % (output_width, output_height))
-    log.ODM_INFO("Adjusted bounds: %r %r %r %r" % (dst_w, dst_s, dst_e, dst_n))
+    INFO("Output width: %d, height: %d" % (output_width, output_height))
+    INFO("Adjusted bounds: %r %r %r %r" % (dst_w, dst_s, dst_e, dst_n))
 
     profile["transform"] = output_transform
     profile["height"] = output_height
@@ -164,6 +167,11 @@ def merge(input_ortho_and_ortho_cuts, output_orthophoto, orthophoto_vars={}):
     with rasterio.open(output_orthophoto, "w", **profile) as dstrast:
         dstrast.colorinterp = colorinterp
         for idx, dst_window in dstrast.block_windows():
+            if feedback is not None and feedback.isCanceled():
+                feedback.pushInfo("Processing cancelled by user.")
+                return {}
+            INFO(f"Processing {idx}")
+
             left, bottom, right, top = dstrast.window_bounds(dst_window)
 
             blocksize = dst_window.width

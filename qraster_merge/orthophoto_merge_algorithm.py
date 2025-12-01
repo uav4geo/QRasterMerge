@@ -12,8 +12,14 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import (QgsProcessing,
                        QgsProcessingParameterMultipleLayers,
                        QgsProcessingParameterRasterDestination,
-                       QgsProcessingAlgorithm)
-
+                       QgsProcessingAlgorithm,
+                       QgsProcessingFeedback,
+                       QgsRasterLayer,
+                       QgsProcessingUtils,
+                       QgsProject)
+import os
+import tempfile
+from .log import WARNING, INFO, CRITICAL, set_log_feedback
 
 class OrthophotoMergeAlgorithm(QgsProcessingAlgorithm):
     """
@@ -56,20 +62,85 @@ class OrthophotoMergeAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterRasterDestination(
                 self.OUTPUT,
-                self.tr('Output layer')
+                self.tr('Merged layer')
             )
         )
 
     def processAlgorithm(self, parameters, context, feedback):
-        """
-        Here is where the processing itself takes place.
-        """
-        from .installer import install_deps
-        install_deps()
-        
-        from orthophoto import merge
+        from .orthophoto import merge, compute_mask_raster, feather_raster
+        from .cutline import compute_cutline
+        from .io import related_file_path
 
-        return {}
+        INPUT_LAYERS = parameters.get('INPUT_LAYERS', [])
+        if len(INPUT_LAYERS) <= 1:
+            CRITICAL("You need at least two raster layers")
+            return
+
+        output_path = self.parameterAsOutputLayer(parameters, self.OUTPUT, context)
+
+        if feedback is None:
+            feedback = QgsProcessingFeedback()
+        
+        set_log_feedback(feedback)
+
+        layers = [layer for layer in QgsProject.instance().mapLayers().values() if isinstance(layer, QgsRasterLayer) and layer.id() in INPUT_LAYERS]
+        temp_dir = QgsProcessingUtils.tempFolder()
+        INFO(f"Using temporary directory: {temp_dir}")
+
+        orthos_and_cuts = []
+
+        for layer in layers:
+            if feedback.isCanceled():
+                feedback.pushInfo("Processing cancelled by user.")
+                return {}
+
+            ortho_file = layer.source()
+            cutline_file = related_file_path(ortho_file, postfix=".cutline", replace_ext=".gpkg")
+            INFO(f"Computing cutline: {ortho_file}")
+
+            if not os.path.isfile(cutline_file):
+                compute_cutline(ortho_file, cutline_file, scale=0.25)
+            else:
+                INFO(f"Using already computed cutline: {cutline_file}")
+
+            
+            if feedback.isCanceled():
+                feedback.pushInfo("Processing cancelled by user.")
+                return {}
+
+            if not os.path.isfile(cutline_file):
+                CRITICAL("Cannot compute cutline. Cannot proceed with merging")
+                return {}
+            
+            orthocut_file = related_file_path(ortho_file, postfix=".cut")
+            orthofeather_file = related_file_path(ortho_file, postfix=".feathered")
+
+            if not os.path.isfile(orthocut_file):
+                compute_mask_raster(ortho_file, cutline_file, 
+                                                orthocut_file,
+                                                blend_distance=20, only_max_coords_feature=True)
+            else:
+                INFO(f"Using already computed raster cut: {orthocut_file}")
+            
+            if feedback.isCanceled():
+                feedback.pushInfo("Processing cancelled by user.")
+                return {}
+
+            if not os.path.isfile(orthofeather_file):
+                feather_raster(ortho_file, 
+                    orthofeather_file,
+                    blend_distance=20
+                )
+            else:
+                INFO(f"Using already computed feathered raster: {orthofeather_file}")
+            
+            orthos_and_cuts.append((orthofeather_file, orthocut_file))
+
+        base_dir = os.path.dirname(output_path)
+        if not os.path.isdir(base_dir):
+            os.makedirs(base_dir)
+
+        return {"OUTPUT": merge(orthos_and_cuts, output_path, feedback=feedback)}
 
     def name(self):
         """

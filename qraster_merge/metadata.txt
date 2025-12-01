@@ -12,7 +12,7 @@ tracker=http://github.com/uav4geo/QRasterMerge/issues
 repository=http://github.com/uav4geo/QRasterMerge
 
 hasProcessingProvider=yes
-tags=raster, merge, orthophoto, blend, seamless
+tags=raster, merge, orthophoto, blend, seamless, seamlessly
 
 homepage=http://github.com/uav4geo/QRasterMerge
 category=Raster
