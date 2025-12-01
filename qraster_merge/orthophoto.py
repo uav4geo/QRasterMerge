@@ -166,11 +166,16 @@ def merge(input_ortho_and_ortho_cuts, output_orthophoto, orthophoto_vars={}, fee
     # create destination file
     with rasterio.open(output_orthophoto, "w", **profile) as dstrast:
         dstrast.colorinterp = colorinterp
-        for idx, dst_window in dstrast.block_windows():
+        windows = list(dstrast.block_windows())
+        c = 0
+
+        for idx, dst_window in windows:
             if feedback is not None and feedback.isCanceled():
                 feedback.pushInfo("Processing cancelled by user.")
                 return {}
-            INFO(f"Processing {idx}")
+
+            INFO(f"Processing {c + 1} / {len(windows)}")
+            c += 1
 
             left, bottom, right, top = dstrast.window_bounds(dst_window)
 

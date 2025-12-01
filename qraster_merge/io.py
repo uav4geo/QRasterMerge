@@ -1,10 +1,12 @@
 import os
-def related_file_path(input_file_path, prefix="", postfix="", replace_base=None, replace_ext=None):
+def related_file_path(input_file_path, prefix="", postfix="", replace_base=None, replace_ext=None, temp_dir=None):
     """
     For example: related_file_path("/path/to/file.ext", "a.", ".b")
      --> "/path/to/a.file.b.ext"
     """
     path, filename = os.path.split(input_file_path)
+    if temp_dir is not None:
+        path = temp_dir
 
     # path = path/to
     # filename = file.ext

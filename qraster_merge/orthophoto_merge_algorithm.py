@@ -12,6 +12,8 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import (QgsProcessing,
                        QgsProcessingParameterMultipleLayers,
                        QgsProcessingParameterRasterDestination,
+                       QgsProcessingParameterEnum,
+                       QgsProcessingParameterNumber,
                        QgsProcessingAlgorithm,
                        QgsProcessingFeedback,
                        QgsRasterLayer,
@@ -56,6 +58,28 @@ class OrthophotoMergeAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                'BLEND_DISTANCE',
+                self.tr('Blend Distance (pixels)'),
+                type=QgsProcessingParameterNumber.Integer,
+                defaultValue=30,
+                minValue=1
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterEnum(
+                'EQUALIZE_HISTOGRAMS',
+                self.tr('Equalize Color Histograms'),
+                options=['LCH', 'RGB', 'Do not equalize (keep original pixels)'],
+                defaultValue=0,
+                allowMultiple=False
+            )
+        )
+
+        
+
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
@@ -70,6 +94,7 @@ class OrthophotoMergeAlgorithm(QgsProcessingAlgorithm):
         from .orthophoto import merge, compute_mask_raster, feather_raster
         from .cutline import compute_cutline
         from .io import related_file_path
+        from .rio_hist.match import hist_match_worker
 
         INPUT_LAYERS = parameters.get('INPUT_LAYERS', [])
         if len(INPUT_LAYERS) <= 1:
@@ -83,19 +108,57 @@ class OrthophotoMergeAlgorithm(QgsProcessingAlgorithm):
         
         set_log_feedback(feedback)
 
-        layers = [layer for layer in QgsProject.instance().mapLayers().values() if isinstance(layer, QgsRasterLayer) and layer.id() in INPUT_LAYERS]
+        layers = []
+        for layer_id in INPUT_LAYERS:
+            layer = QgsProcessingUtils.mapLayerFromString(layer_id, context)
+            if isinstance(layer, QgsRasterLayer):
+                layers.append(layer)
+
+        if len(layers) <= 1:
+            CRITICAL("You need at least two valid raster layers")
+            return {}
+
+        blend_distance = self.parameterAsInt(parameters, 'BLEND_DISTANCE', context)
+        equalize_histograms = self.parameterAsEnum(parameters, 'EQUALIZE_HISTOGRAMS', context)
+        
         temp_dir = QgsProcessingUtils.tempFolder()
         INFO(f"Using temporary directory: {temp_dir}")
 
+        equalize = ['LCH', 'RGB', 'None'][equalize_histograms]
+        sources = []
+
+        if equalize != 'None':
+            INFO("Equalizing histograms")
+
+            reference = layers[0].source()
+            sources.append(reference)
+
+            for i in range(1, len(layers)):
+                to_equalize = layers[i].source()
+
+                equalized_file = related_file_path(to_equalize, postfix=".eq", temp_dir=temp_dir)
+
+                INFO(f"Equalizing {to_equalize}")
+                hist_match_worker(to_equalize, reference, equalized_file, 
+                    1.0, {}, "1,2,3", equalize)
+                
+                if os.path.isfile(equalized_file):
+                    sources.append(equalized_file)
+                else:
+                    WARNING(f"Cannot equalize {to_equalize}, skipping...")
+                    sources.append(to_equalize)
+        else:
+            INFO("No histogram equalization")
+            sources = [l.source() for l in layers]
+
         orthos_and_cuts = []
 
-        for layer in layers:
+        for ortho_file in sources:
             if feedback.isCanceled():
                 feedback.pushInfo("Processing cancelled by user.")
                 return {}
 
-            ortho_file = layer.source()
-            cutline_file = related_file_path(ortho_file, postfix=".cutline", replace_ext=".gpkg")
+            cutline_file = related_file_path(ortho_file, postfix=".cutline", replace_ext=".gpkg", temp_dir=temp_dir)
             INFO(f"Computing cutline: {ortho_file}")
 
             if not os.path.isfile(cutline_file):
@@ -112,13 +175,13 @@ class OrthophotoMergeAlgorithm(QgsProcessingAlgorithm):
                 CRITICAL("Cannot compute cutline. Cannot proceed with merging")
                 return {}
             
-            orthocut_file = related_file_path(ortho_file, postfix=".cut")
-            orthofeather_file = related_file_path(ortho_file, postfix=".feathered")
+            orthocut_file = related_file_path(ortho_file, postfix=".cut", temp_dir=temp_dir)
+            orthofeather_file = related_file_path(ortho_file, postfix=".feathered", temp_dir=temp_dir)
 
             if not os.path.isfile(orthocut_file):
                 compute_mask_raster(ortho_file, cutline_file, 
                                                 orthocut_file,
-                                                blend_distance=20, only_max_coords_feature=True)
+                                                blend_distance=blend_distance, only_max_coords_feature=True)
             else:
                 INFO(f"Using already computed raster cut: {orthocut_file}")
             
@@ -129,7 +192,7 @@ class OrthophotoMergeAlgorithm(QgsProcessingAlgorithm):
             if not os.path.isfile(orthofeather_file):
                 feather_raster(ortho_file, 
                     orthofeather_file,
-                    blend_distance=20
+                    blend_distance=blend_distance
                 )
             else:
                 INFO(f"Using already computed feathered raster: {orthofeather_file}")
