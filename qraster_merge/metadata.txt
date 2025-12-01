@@ -2,7 +2,7 @@
 name=QRasterMerge
 qgisMinimumVersion=3.34
 description=Seamless raster merging and blending
-version=1.0
+version=1.0.1
 author=UAV4GEO
 email=pt@uav4geo.com
 
