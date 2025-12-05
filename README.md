@@ -8,8 +8,6 @@ QGIS plugin for seamlessly merging overlapping rasters. It features memory-effic
 
 ## Installation
 
-> **Note:** This plugin is not yet available on the QGIS plugin manager as it is waiting for approval. Please install manually from the releases page.
-
 Install `QRasterMerge` via the [QGIS](https://qgis.org) plugin manager or import the .zip file manually from [releases](https://github.com/uav4geo/QRasterMerge/releases). Before you install it, make sure you also have the [QPIP](https://github.com/opengisch/qpip) plugin installed, which will take care of installing a few dependencies for you.
 
 Make sure you have at least QGIS 3.40.
